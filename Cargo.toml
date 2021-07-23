@@ -1,0 +1,30 @@
+[package]
+name = "mpvsock"
+version = "0.1.0"
+edition = "2018"
+authors = ["TheEdward162 <TheEdward162@gmail.com>"]
+license = "MIT/Apache-2.0"
+readme = "README.md"
+
+[[bin]]
+name = "mpv-client"
+required-features = ["cli_app"]
+
+[features]
+default = ["cli_app"]
+
+cli_app = ["clap", "anyhow", "edwardium_logger"]
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+thiserror = "1"
+log = "0.4"
+
+clap = { version = "2", optional = true }
+anyhow = { version = "1", optional = true }
+edwardium_logger = { version = "1.2.0", default-features = false, features = ["colored_stderr_output"], optional = true }
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
