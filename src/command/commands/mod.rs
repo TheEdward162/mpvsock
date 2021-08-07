@@ -1,8 +1,6 @@
-use self::property::MpvProperty;
+use super::property::MpvProperty;
 
 use super::MpvCommand;
-
-pub mod property;
 
 impl MpvCommand for str {
 	type Data = Option<serde_json::Value>;

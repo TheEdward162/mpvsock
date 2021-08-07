@@ -28,6 +28,8 @@ impl<'a> MpvProperty for Cow<'a, str> {
 
 macro_rules! impl_known_property {
 	(
+		pub enum $known_enum_name: ident;
+
 		$(
 			$name: ident: $property_name: literal, $value_type: ty
 		),+ $(,)?
@@ -42,6 +44,23 @@ macro_rules! impl_known_property {
 				}
 			}
 		)+
+
+		#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+		pub enum $known_enum_name {
+			$(
+				#[serde(rename = $property_name)]
+				$name
+			),+
+		}
+		impl $known_enum_name {
+			pub const fn proeprty_name(&self) -> &'static str {
+				match self {
+					$(
+						$known_enum_name::$name => $property_name
+					),+
+				}
+			}
+		}
 	};
 }
 
@@ -61,14 +80,17 @@ pub enum TrackIdStr {
 }
 
 impl_known_property! {
-	// f32
-	Volume: "volume", f32,
-	PercentPos: "percent-pos", f32,
-	TimePos: "time-pos", f32,
+	pub enum KnownMpvProperty;
+
+	// f64
+	Volume: "volume", f64,
+	PercentPos: "percent-pos", f64,
+	TimePos: "time-pos", f64,
 	// String
 	Path: "path", String,
 	WorkingDirectory: "working-directory", String,
 	MediaTitle: "media-title", String,
+	Filename: "filename", String,
 	// Track id
 	Aid: "aid", TrackId,
 	Vid: "vid", TrackId,

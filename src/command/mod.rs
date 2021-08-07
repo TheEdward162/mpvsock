@@ -3,6 +3,7 @@ use std::{io, num::NonZeroI64};
 use serde::de::DeserializeOwned;
 
 pub mod commands;
+pub mod property;
 pub mod response;
 
 /// Trait for mpv command definition.

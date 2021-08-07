@@ -303,7 +303,7 @@ impl InteractiveContext {
 	}
 
 	fn run_known_command(&mut self, mpv: &mut MpvLink, mut out: impl Write) -> anyhow::Result<()> {
-		use mpvsock::command::commands::property;
+		use mpvsock::command::property;
 
 		if self.line.trim() == "get_version" {
 			write_result_and_bail!(out; mpv.run_command(&MpvGetVersion))

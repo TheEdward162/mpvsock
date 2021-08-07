@@ -1,8 +1,6 @@
-use serde::{
-	de::{DeserializeOwned, IntoDeserializer},
-	Deserialize,
-	Deserializer
-};
+use serde::{de::DeserializeOwned, Deserialize};
+
+use crate::command::property::KnownMpvProperty;
 
 /// Event model:
 ///
@@ -19,7 +17,6 @@ pub enum MpvResponseEvent {
 	PropertyChange {
 		/// Id of the observer.
 		id: i64,
-		#[serde(deserialize_with = "MpvResponseEventPropertyName::deserialize_with_unknown")]
 		name: MpvResponseEventPropertyName,
 		#[serde(default)]
 		data: serde_json::Value
@@ -69,29 +66,10 @@ pub enum MpvResponseEvent {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "kebab-case")]
-
+#[serde(untagged)]
 pub enum MpvResponseEventPropertyName {
-	Volume,
-	Filename,
-	#[serde(rename = "filename/no-ext")]
-	FilenameNoExt,
-	// unknown
-	#[serde(skip_deserializing)]
+	Known(KnownMpvProperty),
 	Unknown(String)
-}
-impl MpvResponseEventPropertyName {
-	pub fn deserialize_with_unknown<'de, D: Deserializer<'de>>(
-		deserializer: D
-	) -> Result<Self, D::Error> {
-		let string = String::deserialize(deserializer)?;
-
-		match Self::deserialize(IntoDeserializer::<'de, D::Error>::into_deserializer(
-			string.as_str()
-		)) {
-			Ok(value) => Ok(value),
-			Err(_) => Ok(Self::Unknown(string))
-		}
-	}
 }
 
 /// Result model:
@@ -149,7 +127,7 @@ pub enum MpvResponse<ResponseData: DeserializeOwned = serde_json::Value> {
 
 #[cfg(test)]
 mod test {
-	use super::{MpvResponseEvent, MpvResponseEventPropertyName};
+	use super::{KnownMpvProperty, MpvResponseEvent, MpvResponseEventPropertyName};
 
 	#[test]
 	fn test_mpv_response_event_property_change() {
@@ -166,7 +144,7 @@ mod test {
 		match response {
 			MpvResponseEvent::PropertyChange {
 				id: 1,
-				name: MpvResponseEventPropertyName::Filename,
+				name: MpvResponseEventPropertyName::Known(KnownMpvProperty::Filename),
 				data: serde_json::Value::Null
 			} => (),
 			me => panic!("Expected MpvResponseEvent::PropertyChange {{ id: 1, name: Filename, data: null }} but found {:?}", me)
