@@ -4,9 +4,13 @@ use std::{
 	path::Path
 };
 
+use anyhow::Context;
 use clap::{App, Arg, ArgGroup, ArgMatches, SubCommand};
 
-use mpvsock::link::MpvLink;
+use mpvsock::{
+	command::commands::{MpvGetProperty, MpvGetVersion, MpvSetProperty},
+	link::MpvLink
+};
 
 fn parse_cli() -> ArgMatches<'static> {
 	App::new(env!("CARGO_PKG_NAME"))
@@ -50,12 +54,6 @@ fn parse_cli() -> ArgMatches<'static> {
 		.subcommand(
 			SubCommand::with_name("interactive")
 				.about("Opens and interactive command prompt")
-				.arg(
-					Arg::with_name("raw")
-						.long("raw")
-						.takes_value(false)
-						.help("Send input lines raw as the command array. The line must be valid JSON array without the `[]` enclosing characters.")
-				)
 		)
 		.get_matches()
 }
@@ -103,17 +101,55 @@ fn main() -> anyhow::Result<()> {
 	Ok(())
 }
 
+enum InputMode {
+	Raw,
+	String,
+	Known
+}
+
 struct InteractiveContext {
 	line: String,
 	command: String,
-	is_raw: bool
+	mode: InputMode
+}
+macro_rules! write_result_and_bail {
+	(
+		$out: expr; $result: expr
+	) => {
+		match $result {
+			Ok(result) => {
+				writeln!($out, "Result: {:?}", result)?;
+
+				return Ok(())
+			}
+			Err(err) => {
+				writeln!($out, "Error: {}", err)?;
+
+				return Ok(())
+			}
+		}
+	};
+}
+macro_rules! write_error_and_bail {
+	(
+		$out: expr; $result: expr
+	) => {
+		match $result {
+			Ok(result) => result,
+			Err(err) => {
+				writeln!($out, "Error: {}", err)?;
+
+				return Ok(())
+			}
+		}
+	};
 }
 impl InteractiveContext {
-	pub fn new(matches: &ArgMatches) -> Self {
+	pub fn new(_matches: &ArgMatches) -> Self {
 		InteractiveContext {
 			line: String::new(),
 			command: String::new(),
-			is_raw: matches.is_present("raw")
+			mode: InputMode::String
 		}
 	}
 
@@ -145,20 +181,11 @@ impl InteractiveContext {
 				}
 			}
 
-			let cmd = if self.is_raw {
-				&self.line
-			} else {
-				self.build_command()?
-			};
-
-			match mpv.run_command(cmd) {
-				Ok(result) => {
-					writeln!(&mut stdout, "Result: {:?}", result)?;
-				}
-				Err(err) => {
-					writeln!(&mut stdout, "Error: {}", err)?;
-				}
-			};
+			match self.mode {
+				InputMode::Raw => self.run_raw_command(mpv, &mut stdout),
+				InputMode::String => self.run_string_command(mpv, &mut stdout),
+				InputMode::Known => self.run_known_command(mpv, &mut stdout)
+			}?;
 		}
 
 		Ok(())
@@ -181,9 +208,21 @@ impl InteractiveContext {
 
 				false
 			}
-			"#raw" => {
-				self.is_raw = !self.is_raw;
-				self.write_raw_mode(&mut out)?;
+			"#mode raw" => {
+				self.mode = InputMode::Raw;
+				self.write_mode(&mut out)?;
+
+				false
+			}
+			"#mode string" => {
+				self.mode = InputMode::String;
+				self.write_mode(&mut out)?;
+
+				false
+			}
+			"#mode known" => {
+				self.mode = InputMode::Known;
+				self.write_mode(&mut out)?;
 
 				false
 			}
@@ -205,29 +244,46 @@ impl InteractiveContext {
 
 	fn write_help(&self, mut out: impl Write) -> Result<(), io::Error> {
 		writeln!(&mut out, "Help:")?;
-		writeln!(&mut out, "\tInput commands: #help #events #raw #quit")?;
+		writeln!(
+			&mut out,
+			"\tInput commands:\n\t\t#help\n\t\t#events\n\t\t#mode raw|string|known\n\t\t#quit"
+		)?;
 
-		self.write_raw_mode(&mut out)?;
+		self.write_mode(&mut out)?;
 
 		writeln!(&mut out)?;
 
 		Ok(())
 	}
 
-	fn write_raw_mode(&self, mut out: impl Write) -> Result<(), io::Error> {
-		if self.is_raw {
-			writeln!(&mut out, "\tRaw mode is on")?;
-		} else {
-			writeln!(
-				&mut out,
-				"\tRaw mode is off, prefix values with @ to pass them verbatim"
-			)?;
+	fn write_mode(&self, mut out: impl Write) -> Result<(), io::Error> {
+		match self.mode {
+			InputMode::Raw => {
+				writeln!(
+					&mut out,
+					"\tRaw mode is on, input is directly pasted as JSON array elements"
+				)?;
+			}
+			InputMode::String => {
+				writeln!(&mut out, "\tString mode is on, input is split by spaces and elements are quoted (prefix element with @ to disable quoting)")?;
+			}
+			InputMode::Known => {
+				writeln!(&mut out, "\tKnown mode is on, only known commands are accepted and their result is properly parsed")?;
+				writeln!(
+					&mut out,
+					"\tKnown commands: get_version get_property set_property"
+				)?;
+			}
 		}
 
 		Ok(())
 	}
 
-	fn build_command(&mut self) -> Result<&str, std::fmt::Error> {
+	fn run_raw_command(&mut self, mpv: &mut MpvLink, mut out: impl Write) -> anyhow::Result<()> {
+		write_result_and_bail!(out; mpv.run_command(self.line.as_str()))
+	}
+
+	fn run_string_command(&mut self, mpv: &mut MpvLink, mut out: impl Write) -> anyhow::Result<()> {
 		self.command.clear();
 
 		for word in self.line.split(' ') {
@@ -241,6 +297,111 @@ impl InteractiveContext {
 		}
 
 		// remove the trailing comma
-		Ok(&self.command[.. self.command.len().saturating_sub(1)])
+		let command = &self.command[.. self.command.len().saturating_sub(1)];
+
+		write_result_and_bail!(out; mpv.run_command(command))
+	}
+
+	fn run_known_command(&mut self, mpv: &mut MpvLink, mut out: impl Write) -> anyhow::Result<()> {
+		use mpvsock::command::commands::property;
+
+		if self.line.trim() == "get_version" {
+			write_result_and_bail!(out; mpv.run_command(&MpvGetVersion))
+		}
+
+		if self.line.starts_with("get_property") {
+			let mut iter = self.line.splitn(2, ' ');
+			iter.next().unwrap(); // get_property
+			let property_name = write_error_and_bail!(
+				&mut out; iter.next().context("get_property expects an argument")
+			);
+
+			macro_rules! choose_property {
+				(
+					$(
+						$known_struct: ident: $known_name: literal
+					),+ $(,)?
+				) => {
+					match property_name {
+						$(
+							$known_name => {
+								let command = MpvGetProperty::new(property::$known_struct);
+								write_result_and_bail!(out; mpv.run_command(&command))
+							}
+						)+
+						_ => {
+							let command = MpvGetProperty::new(property_name);
+							write_result_and_bail!(out; mpv.run_command(&command))
+						}
+					}
+				}
+			}
+
+			choose_property!(
+				Volume: "volume",
+				PercentPos: "percent-pos",
+				TimePos: "time-pos",
+				Path: "path",
+				WorkingDirectory: "working-directory",
+				MediaTitle: "media-title",
+				Aid: "aid",
+				Vid: "vid",
+				Sid: "sid",
+				Fullscreen: "fullscreen",
+				Pause: "pause",
+			)
+		}
+
+		if self.line.starts_with("set_property") {
+			let mut iter = self.line.splitn(3, ' ');
+			iter.next().unwrap(); // set_property
+			let property_name = write_error_and_bail!(
+				&mut out; iter.next().context("set_property expects two arguments")
+			);
+			let property_value = write_error_and_bail!(
+				&mut out; iter.next().context("set_property expects two arguments")
+			);
+
+			macro_rules! choose_property {
+				(
+					$(
+						$known_struct: ident: $known_name: literal
+					),+ $(,)?
+				) => {
+					match property_name {
+						$(
+							$known_name => {
+								let command = MpvSetProperty::new(
+									property::$known_struct,
+									serde_json::from_str(property_value)?
+								);
+								write_result_and_bail!(out; mpv.run_command(&command))
+							}
+						)+
+						_ => {
+							let command = MpvSetProperty::new(property_name, property_value.into());
+							write_result_and_bail!(out; mpv.run_command(&command))
+						}
+					}
+				}
+			}
+
+			choose_property!(
+				Volume: "volume",
+				PercentPos: "percent-pos",
+				TimePos: "time-pos",
+				Path: "path",
+				WorkingDirectory: "working-directory",
+				MediaTitle: "media-title",
+				Aid: "aid",
+				Vid: "vid",
+				Sid: "sid",
+				Fullscreen: "fullscreen",
+				Pause: "pause",
+			)
+		}
+
+		writeln!(out, "Unrecognized command")?;
+		Ok(())
 	}
 }

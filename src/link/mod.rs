@@ -1,9 +1,6 @@
-use std::{
-	io::{self, Write},
-	num::NonZeroI64,
-	path::Path
-};
+use std::{io, num::NonZeroI64, path::Path};
 
+use serde::de::DeserializeOwned;
 use thiserror::Error;
 
 use crate::response_buffer::ResponseBuffer;
@@ -123,7 +120,7 @@ impl MpvLink {
 	pub fn run_command<C: MpvCommand + ?Sized>(
 		&mut self,
 		command: &C
-	) -> Result<C::Data, CommandError<C::Error>> {
+	) -> Result<C::ParsedData, CommandError<C::Error>> {
 		let current_id = {
 			let current = self.current_id;
 			self.current_id =
@@ -133,10 +130,9 @@ impl MpvLink {
 
 		self.send_command(command, current_id)?;
 
-		let result = self.next_result()?;
-		log::debug!("Received result: {:?}", result);
+		let result = self.next_result::<C::Data>()?;
 
-		match result.request_id {
+		match result.request_id() {
 			Some(request_id) if request_id == current_id.get() => (),
 			request_id => {
 				return Err(ReceiveError::RequestIdMismatch {
@@ -147,11 +143,16 @@ impl MpvLink {
 			}
 		};
 
-		let data = command
-			.parse_data(result.data)
-			.map_err(CommandError::DataParseError)?;
+		match result {
+			MpvResponseResult::Error { error, .. } => Err(CommandError::ResultError(error)),
+			MpvResponseResult::Success { data, .. } => {
+				let data = command
+					.parse_data(data)
+					.map_err(CommandError::DataParseError)?;
 
-		Ok(data)
+				Ok(data)
+			}
+		}
 	}
 
 	/// Polls for events which are added to the internal queue.
@@ -189,13 +190,23 @@ impl MpvLink {
 	) -> Result<(), SendError> {
 		let context = MpvCommandContext::new(command, Some(current_id));
 
-		log::debug!("Sending command: {}", context);
-		writeln!(self.inner.stream(), "{}", context)?;
+		if log::log_enabled!(log::Level::Debug) {
+			let mut buffer = Vec::new();
+			context.write(&mut buffer)?;
+
+			match std::str::from_utf8(&buffer) {
+				Ok(command) => log::debug!("Sending command: {}", command),
+				Err(_) => log::debug!("Sending command: {:?}", buffer)
+			};
+		}
+		context.writeln(self.inner.stream())?;
 
 		Ok(())
 	}
 
-	fn next_response(&mut self) -> Result<Option<MpvResponse>, ReceiveError> {
+	fn next_response<ResponseData: DeserializeOwned>(
+		&mut self
+	) -> Result<Option<MpvResponse<ResponseData>>, ReceiveError> {
 		let line = match self.response_buffer.consume_line() {
 			Some(line) => line,
 			None => {
@@ -207,12 +218,14 @@ impl MpvLink {
 			}
 		};
 
-		let response: MpvResponse = serde_json::from_slice(line)?;
+		let response: MpvResponse<ResponseData> = serde_json::from_slice(line)?;
 
 		Ok(Some(response))
 	}
 
-	fn next_result(&mut self) -> Result<MpvResponseResult, ReceiveError> {
+	fn next_result<Data: DeserializeOwned>(
+		&mut self
+	) -> Result<MpvResponseResult<Data>, ReceiveError> {
 		let result = loop {
 			match self.next_response()? {
 				None => self.inner.wait_read(None)?,

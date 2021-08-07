@@ -69,7 +69,7 @@ impl ResponseBuffer {
 				let line = &self.buffer[self.position ..][.. end];
 				self.position += end + 1;
 
-				if log::log_enabled!(log::Level::Trace) {
+				if log::log_enabled!(log::Level::Debug) {
 					match std::str::from_utf8(line) {
 						Ok(line) => {
 							log::trace!("Consumed line: {}", line);

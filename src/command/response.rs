@@ -1,4 +1,8 @@
-use serde::{Deserialize, Deserializer, de::IntoDeserializer};
+use serde::{
+	de::{DeserializeOwned, IntoDeserializer},
+	Deserialize,
+	Deserializer
+};
 
 /// Event model:
 ///
@@ -24,9 +28,7 @@ pub enum MpvResponseEvent {
 	LogMessage {}, // TOOD
 	// media
 	#[serde(rename = "start-file")]
-	StartFile {
-		playlist_entry_id: i64
-	},
+	StartFile { playlist_entry_id: i64 },
 	#[serde(rename = "end-file")]
 	EndFile {}, // TODO
 	#[serde(rename = "file-loaded")]
@@ -78,12 +80,14 @@ pub enum MpvResponseEventPropertyName {
 	Unknown(String)
 }
 impl MpvResponseEventPropertyName {
-	pub fn deserialize_with_unknown<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+	pub fn deserialize_with_unknown<'de, D: Deserializer<'de>>(
+		deserializer: D
+	) -> Result<Self, D::Error> {
 		let string = String::deserialize(deserializer)?;
 
-		match Self::deserialize(
-			IntoDeserializer::<'de, D::Error>::into_deserializer(string.as_str())
-		) {
+		match Self::deserialize(IntoDeserializer::<'de, D::Error>::into_deserializer(
+			string.as_str()
+		)) {
 			Ok(value) => Ok(value),
 			Err(_) => Ok(Self::Unknown(string))
 		}
@@ -93,32 +97,54 @@ impl MpvResponseEventPropertyName {
 /// Result model:
 ///
 /// ```json
-/// { "error": "success", "data"?: "value" | 123 | true | null, "request_id"?: 123 }
+/// { "error": "success" | "invalid paramter" | "...", "data"?: "value" | 123 | true | null, "request_id"?: 123 }
 /// ```
 #[derive(Debug, Deserialize)]
-pub struct MpvResponseResult {
-	pub error: MpvResponseResultError,
-	#[serde(default)]
-	pub data: serde_json::Value,
-	pub request_id: Option<i64>
+#[serde(untagged)]
+pub enum MpvResponseResult<Data: DeserializeOwned = serde_json::Value> {
+	Success {
+		error: MpvResponseResultSuccess,
+		#[serde(bound = "")]
+		data: Data,
+		request_id: Option<i64>
+	},
+	Error {
+		error: MpvResponseResultError,
+		request_id: Option<i64>
+	}
+}
+impl<D: DeserializeOwned> MpvResponseResult<D> {
+	pub fn request_id(&self) -> Option<i64> {
+		match self {
+			MpvResponseResult::Success { request_id, .. } => *request_id,
+			MpvResponseResult::Error { request_id, .. } => *request_id
+		}
+	}
+}
+
+#[derive(Debug, Deserialize)]
+pub enum MpvResponseResultSuccess {
+	#[serde(rename = "success")]
+	Success
 }
 
 #[derive(Debug, Deserialize)]
 pub enum MpvResponseResultError {
-	#[serde(rename = "success")]
-	Success,
 	#[serde(rename = "invalid parameter")]
 	InvalidParameter,
 	#[serde(rename = "property unavailable")]
-	PropertUnavailable
+	PropertyUnavailable,
+	#[serde(rename = "property not found")]
+	PropertyNotFound
 }
 
 /// Either a mpv event or a mpv result.
 #[derive(Debug, Deserialize)]
 #[serde(untagged)]
-pub enum MpvResponse {
+pub enum MpvResponse<ResponseData: DeserializeOwned = serde_json::Value> {
 	Event(MpvResponseEvent),
-	Result(MpvResponseResult)
+	#[serde(bound = "")]
+	Result(MpvResponseResult<ResponseData>)
 }
 
 #[cfg(test)]
