@@ -23,8 +23,8 @@ impl MpvCommand for str {
 	}
 }
 
-pub struct MpvGetVersion;
-impl MpvCommand for MpvGetVersion {
+pub struct CmdGetVersion;
+impl MpvCommand for CmdGetVersion {
 	type Data = u32;
 	type Error = serde_json::Error;
 	type ParsedData = (u16, u16);
@@ -41,13 +41,13 @@ impl MpvCommand for MpvGetVersion {
 	}
 }
 
-pub struct MpvGetProperty<P: MpvProperty>(P);
-impl<P: MpvProperty> MpvGetProperty<P> {
+pub struct CmdGetProperty<P: MpvProperty>(P);
+impl<P: MpvProperty> CmdGetProperty<P> {
 	pub fn new(property: P) -> Self {
-		MpvGetProperty(property)
+		CmdGetProperty(property)
 	}
 }
-impl<P: MpvProperty> MpvCommand for MpvGetProperty<P> {
+impl<P: MpvProperty> MpvCommand for CmdGetProperty<P> {
 	type Data = P::Value;
 	type Error = std::convert::Infallible;
 	type ParsedData = Self::Data;
@@ -62,13 +62,13 @@ impl<P: MpvProperty> MpvCommand for MpvGetProperty<P> {
 }
 
 
-pub struct MpvSetProperty<P: MpvProperty>(P, P::Value);
-impl<P: MpvProperty> MpvSetProperty<P> {
+pub struct CmdSetProperty<P: MpvProperty>(P, P::Value);
+impl<P: MpvProperty> CmdSetProperty<P> {
 	pub fn new(property: P, value: P::Value) -> Self {
-		MpvSetProperty(property, value)
+		CmdSetProperty(property, value)
 	}
 }
-impl<P: MpvProperty> MpvCommand for MpvSetProperty<P> {
+impl<P: MpvProperty> MpvCommand for CmdSetProperty<P> {
 	type Data = Option<()>;
 	type Error = serde_json::Error;
 	type ParsedData = Self::Data;
@@ -85,13 +85,13 @@ impl<P: MpvProperty> MpvCommand for MpvSetProperty<P> {
 	}
 }
 
-pub struct MpvObserveProperty<P: MpvProperty>(u32, P);
-impl<P: MpvProperty> MpvObserveProperty<P> {
+pub struct CmdObserveProperty<P: MpvProperty>(u32, P);
+impl<P: MpvProperty> CmdObserveProperty<P> {
 	pub fn new(observer_id: u32, property: P) -> Self {
-		MpvObserveProperty(observer_id, property)
+		CmdObserveProperty(observer_id, property)
 	}
 }
-impl<P: MpvProperty> MpvCommand for MpvObserveProperty<P> {
+impl<P: MpvProperty> MpvCommand for CmdObserveProperty<P> {
 	type Data = Option<()>;
 	type Error = std::convert::Infallible;
 	type ParsedData = Self::Data;
@@ -105,13 +105,13 @@ impl<P: MpvProperty> MpvCommand for MpvObserveProperty<P> {
 	}
 }
 
-pub struct MpvUnobserveProperty(u32);
-impl MpvUnobserveProperty {
+pub struct CmdUnobserveProperty(u32);
+impl CmdUnobserveProperty {
 	pub fn new(observer_id: u32) -> Self {
-		MpvUnobserveProperty(observer_id)
+		CmdUnobserveProperty(observer_id)
 	}
 }
-impl MpvCommand for MpvUnobserveProperty {
+impl MpvCommand for CmdUnobserveProperty {
 	type Data = Option<()>;
 	type Error = std::convert::Infallible;
 	type ParsedData = Self::Data;
@@ -125,19 +125,19 @@ impl MpvCommand for MpvUnobserveProperty {
 	}
 }
 
-pub struct MpvLoadfile<'a>(pub Cow<'a, str>);
-impl<'a> MpvLoadfile<'a> {
+pub struct CmdLoadfile<'a>(pub Cow<'a, str>);
+impl<'a> CmdLoadfile<'a> {
 	pub fn new(file_path: Cow<'a, str>) -> Self {
-		MpvLoadfile(file_path)
+		CmdLoadfile(file_path)
 	}
 }
-impl<'a> MpvCommand for MpvLoadfile<'a> {
+impl<'a> MpvCommand for CmdLoadfile<'a> {
 	type Data = Option<()>;
 	type Error = std::convert::Infallible;
 	type ParsedData = Self::Data;
 
 	fn write_args(&self, mut w: impl std::io::Write) -> std::io::Result<()> {
-		write!(w, "\"loadfile\",{}", self.0)
+		write!(w, "\"loadfile\",\"{}\"", self.0)
 	}
 
 	fn parse_data(&self, data: Self::Data) -> Result<Self::ParsedData, Self::Error> {
@@ -145,13 +145,13 @@ impl<'a> MpvCommand for MpvLoadfile<'a> {
 	}
 }
 
-pub struct MpvStop(pub bool);
-impl MpvStop {
+pub struct CmdStop(pub bool);
+impl CmdStop {
 	pub fn new(keep_playlist: bool) -> Self {
-		MpvStop(keep_playlist)
+		CmdStop(keep_playlist)
 	}
 }
-impl MpvCommand for MpvStop {
+impl MpvCommand for CmdStop {
 	type Data = Option<()>;
 	type Error = std::convert::Infallible;
 	type ParsedData = Self::Data;

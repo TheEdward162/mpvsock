@@ -8,7 +8,7 @@ use anyhow::Context;
 use clap::{App, Arg, ArgGroup, ArgMatches, SubCommand};
 
 use mpvsock::{
-	command::commands::{MpvGetProperty, MpvGetVersion, MpvSetProperty},
+	command::commands::{CmdGetProperty, CmdGetVersion, CmdSetProperty},
 	link::MpvLink
 };
 
@@ -312,7 +312,7 @@ impl InteractiveContext {
 		use mpvsock::command::property;
 
 		if self.line.trim() == "get_version" {
-			write_result_and_bail!(out; mpv.run_command(&MpvGetVersion))
+			write_result_and_bail!(out; mpv.run_command(&CmdGetVersion))
 		}
 
 		if self.line.starts_with("get_property") {
@@ -331,12 +331,12 @@ impl InteractiveContext {
 					match property_name {
 						$(
 							$known_name => {
-								let command = MpvGetProperty::new(property::$known_struct);
+								let command = CmdGetProperty::new(property::$known_struct);
 								write_result_and_bail!(out; mpv.run_command(&command))
 							}
 						)+
 						_ => {
-							let command = MpvGetProperty::new(property_name);
+							let command = CmdGetProperty::new(property_name);
 							write_result_and_bail!(out; mpv.run_command(&command))
 						}
 					}
@@ -377,7 +377,7 @@ impl InteractiveContext {
 					match property_name {
 						$(
 							$known_name => {
-								let command = MpvSetProperty::new(
+								let command = CmdSetProperty::new(
 									property::$known_struct,
 									serde_json::from_str(property_value)?
 								);
@@ -385,7 +385,7 @@ impl InteractiveContext {
 							}
 						)+
 						_ => {
-							let command = MpvSetProperty::new(property_name, property_value.into());
+							let command = CmdSetProperty::new(property_name, property_value.into());
 							write_result_and_bail!(out; mpv.run_command(&command))
 						}
 					}
