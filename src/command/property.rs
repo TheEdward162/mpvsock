@@ -2,6 +2,8 @@ use std::borrow::Cow;
 
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
+use crate::model::TrackId;
+
 pub trait MpvProperty {
 	type Value: Serialize + DeserializeOwned;
 
@@ -62,26 +64,6 @@ macro_rules! impl_known_property {
 			}
 		}
 	};
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(untagged)]
-pub enum TrackId {
-	Index(u32),
-	Other(TrackIdOther)
-}
-impl Default for TrackId {
-	fn default() -> Self {
-		TrackId::Other(TrackIdOther::Auto)
-	}
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub enum TrackIdOther {
-	#[serde(rename = "auto")]
-	Auto,
-	#[serde(other)]
-	Unknown
 }
 
 impl_known_property! {

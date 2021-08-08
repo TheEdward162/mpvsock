@@ -1,6 +1,6 @@
 use serde::{de::DeserializeOwned, Deserialize};
 
-use crate::command::property::KnownMpvProperty;
+use crate::{command::property::KnownMpvProperty, model::FileloadInfo};
 
 /// Event model:
 ///
@@ -25,7 +25,7 @@ pub enum MpvResponseEvent {
 	LogMessage {}, // TOOD
 	// media
 	#[serde(rename = "start-file")]
-	StartFile { playlist_entry_id: i64 },
+	StartFile(FileloadInfo),
 	#[serde(rename = "end-file")]
 	EndFile {}, // TODO
 	#[serde(rename = "file-loaded")]
@@ -99,13 +99,11 @@ impl<D: DeserializeOwned> MpvResponseResult<D> {
 		}
 	}
 }
-
 #[derive(Debug, Deserialize)]
 pub enum MpvResponseResultSuccess {
 	#[serde(rename = "success")]
 	Success
 }
-
 #[derive(Debug, Deserialize)]
 pub enum MpvResponseResultError {
 	#[serde(rename = "invalid parameter")]

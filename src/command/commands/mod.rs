@@ -1,5 +1,7 @@
 use std::borrow::Cow;
 
+use crate::model::FileloadInfo;
+
 use super::property::MpvProperty;
 
 use super::MpvCommand;
@@ -132,7 +134,7 @@ impl<'a> CmdLoadfile<'a> {
 	}
 }
 impl<'a> MpvCommand for CmdLoadfile<'a> {
-	type Data = Option<()>;
+	type Data = FileloadInfo;
 	type Error = std::convert::Infallible;
 	type ParsedData = Self::Data;
 
