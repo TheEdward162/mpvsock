@@ -198,13 +198,19 @@ impl InteractiveContext {
 	) -> anyhow::Result<bool> {
 		let res = match self.line.as_str() {
 			"#events" => {
-				let events = mpv.poll_events()?;
-				writeln!(&mut out, "Events ({}):", events.len())?;
+				mpv.poll_events()?;
+
+				let events = mpv.drain_events();
+				writeln!(&mut out, "Events ({}):", {
+					let hint = events.size_hint();
+					match hint.1 {
+						None => hint.0,
+						Some(hint) => hint
+					}
+				})?;
 				for event in events {
 					writeln!(&mut out, "\t{:?}", event)?;
 				}
-
-				mpv.clear_events();
 
 				false
 			}
