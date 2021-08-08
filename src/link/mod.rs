@@ -178,9 +178,8 @@ impl MpvLink {
 		Ok(&self.event_queue)
 	}
 
-	/// Clears all currently queued events.
-	pub fn clear_events(&mut self) {
-		self.event_queue.clear();
+	pub fn drain_events(&mut self) -> impl Iterator<Item = MpvResponseEvent> + '_ {
+		self.event_queue.drain(..)
 	}
 
 	fn send_command<C: MpvCommand + ?Sized>(
