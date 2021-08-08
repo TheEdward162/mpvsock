@@ -68,11 +68,16 @@ macro_rules! impl_known_property {
 #[serde(untagged)]
 pub enum TrackId {
 	Index(u32),
-	Str(TrackIdStr)
+	Other(TrackIdOther)
+}
+impl Default for TrackId {
+	fn default() -> Self {
+		TrackId::Other(TrackIdOther::Auto)
+	}
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub enum TrackIdStr {
+pub enum TrackIdOther {
 	#[serde(rename = "auto")]
 	Auto,
 	#[serde(other)]

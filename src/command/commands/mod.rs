@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use super::property::MpvProperty;
 
 use super::MpvCommand;
@@ -116,6 +118,50 @@ impl MpvCommand for MpvUnobserveProperty {
 
 	fn write_args(&self, mut w: impl std::io::Write) -> std::io::Result<()> {
 		write!(w, "\"unobserve_property\",{}", self.0)
+	}
+
+	fn parse_data(&self, data: Self::Data) -> Result<Self::ParsedData, Self::Error> {
+		Ok(data)
+	}
+}
+
+pub struct MpvLoadfile<'a>(pub Cow<'a, str>);
+impl<'a> MpvLoadfile<'a> {
+	pub fn new(file_path: Cow<'a, str>) -> Self {
+		MpvLoadfile(file_path)
+	}
+}
+impl<'a> MpvCommand for MpvLoadfile<'a> {
+	type Data = Option<()>;
+	type Error = std::convert::Infallible;
+	type ParsedData = Self::Data;
+
+	fn write_args(&self, mut w: impl std::io::Write) -> std::io::Result<()> {
+		write!(w, "\"loadfile\",{}", self.0)
+	}
+
+	fn parse_data(&self, data: Self::Data) -> Result<Self::ParsedData, Self::Error> {
+		Ok(data)
+	}
+}
+
+pub struct MpvStop(pub bool);
+impl MpvStop {
+	pub fn new(keep_playlist: bool) -> Self {
+		MpvStop(keep_playlist)
+	}
+}
+impl MpvCommand for MpvStop {
+	type Data = Option<()>;
+	type Error = std::convert::Infallible;
+	type ParsedData = Self::Data;
+
+	fn write_args(&self, mut w: impl std::io::Write) -> std::io::Result<()> {
+		if self.0 {
+			write!(w, "\"stop\",\"keep-playlist\"")
+		} else {
+			write!(w, "\"stop\"")
+		}
 	}
 
 	fn parse_data(&self, data: Self::Data) -> Result<Self::ParsedData, Self::Error> {
