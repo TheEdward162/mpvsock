@@ -27,49 +27,10 @@ impl MpvLink {
 		let (socket, mpv_socket) = UnixStream::pair().map_err(MpvLinkInitError::SocketPair)?;
 
 		// unset cloexec so the child inherits the socket
-		// code stolen from stdlib `FileDesc`
 		unsafe {
-			#[cfg(any(
-				target_env = "newlib",
-				target_os = "solaris",
-				target_os = "illumos",
-				target_os = "emscripten",
-				target_os = "fuchsia",
-				target_os = "l4re",
-				target_os = "linux",
-				target_os = "haiku",
-				target_os = "redox",
-				target_os = "vxworks"
-			))]
-			{
-				let current_flags = libc::fcntl(mpv_socket.as_raw_fd(), libc::F_GETFD);
-				if current_flags < 0 {
-					return Err(MpvLinkInitError::Cloexec(io::Error::last_os_error()))
-				}
-
-				let res = libc::fcntl(mpv_socket.as_raw_fd(), current_flags & !libc::FD_CLOEXEC);
-				if res < 0 {
-					return Err(MpvLinkInitError::Cloexec(io::Error::last_os_error()))
-				}
-			}
-
-			#[cfg(not(any(
-				target_env = "newlib",
-				target_os = "solaris",
-				target_os = "illumos",
-				target_os = "emscripten",
-				target_os = "fuchsia",
-				target_os = "l4re",
-				target_os = "linux",
-				target_os = "haiku",
-				target_os = "redox",
-				target_os = "vxworks"
-			)))]
-			{
-				let res = libc::ioctl(mpv_socket.as_raw_fd(), libc::FIONCLEX);
-				if res < 0 {
-					return Err(MpvLinkInitError::Cloexec(io::Error::last_os_error()))
-				}
+			let res = libc::ioctl(mpv_socket.as_raw_fd(), libc::FIONCLEX);
+			if res < 0 {
+				return Err(MpvLinkInitError::Cloexec(io::Error::last_os_error()))
 			}
 		}
 
