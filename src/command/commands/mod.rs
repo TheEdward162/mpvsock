@@ -87,6 +87,34 @@ impl<P: MpvProperty> MpvCommand for CmdSetProperty<P> {
 	}
 }
 
+pub struct CmdCycleProperty<P: MpvProperty>(P, bool);
+impl<P: MpvProperty> CmdCycleProperty<P> {
+	pub fn new(property: P, down: bool) -> Self {
+		CmdCycleProperty(property, down)
+	}
+}
+impl<P: MpvProperty> MpvCommand for CmdCycleProperty<P> {
+	type Data = Option<()>;
+	type Error = serde_json::Error;
+	type ParsedData = Self::Data;
+
+	fn write_args(&self, mut w: impl std::io::Write) -> std::io::Result<()> {
+		let direction = match self.1 {
+			false => "up",
+			true => "down"
+		};
+		
+		write!(w, "\"cycle\",\"{}\",\"{}\"", self.0.name(), direction)?;
+
+
+		Ok(())
+	}
+
+	fn parse_data(&self, data: Self::Data) -> Result<Self::ParsedData, Self::Error> {
+		Ok(data)
+	}
+}
+
 pub struct CmdObserveProperty<P: MpvProperty>(u32, P);
 impl<P: MpvProperty> CmdObserveProperty<P> {
 	pub fn new(observer_id: u32, property: P) -> Self {
@@ -147,7 +175,7 @@ impl<'a> MpvCommand for CmdLoadfile<'a> {
 	}
 }
 
-pub struct CmdStop(pub bool);
+pub struct CmdStop(bool);
 impl CmdStop {
 	pub fn new(keep_playlist: bool) -> Self {
 		CmdStop(keep_playlist)
@@ -163,6 +191,49 @@ impl MpvCommand for CmdStop {
 			write!(w, "\"stop\",\"keep-playlist\"")
 		} else {
 			write!(w, "\"stop\"")
+		}
+	}
+
+	fn parse_data(&self, data: Self::Data) -> Result<Self::ParsedData, Self::Error> {
+		Ok(data)
+	}
+}
+
+enum CmdSeekInner {
+	AbsoluteTime(f64),
+	AbsolutePercent(f64),
+	RelativeTime(f64),
+	RelativePercent(f64)
+}
+pub struct CmdSeek(CmdSeekInner);
+impl CmdSeek {
+	pub fn time(time: f64, absolute: bool) -> Self {
+		if absolute {
+			CmdSeek(CmdSeekInner::AbsoluteTime(time))
+		} else {
+			CmdSeek(CmdSeekInner::RelativeTime(time))
+		}
+	}
+
+	pub fn percent(percent: f64, absolute: bool) -> Self {
+		if absolute {
+			CmdSeek(CmdSeekInner::AbsolutePercent(percent))
+		} else {
+			CmdSeek(CmdSeekInner::RelativePercent(percent))
+		}
+	}
+}
+impl MpvCommand for CmdSeek {
+	type Data = Option<()>;
+	type Error = std::convert::Infallible;
+	type ParsedData = Self::Data;
+
+	fn write_args(&self, mut w: impl std::io::Write) -> std::io::Result<()> {
+		match self.0 {
+			CmdSeekInner::AbsoluteTime(time) => write!(w, "\"seek\",{},\"absolute\"", time),
+			CmdSeekInner::AbsolutePercent(percent) => write!(w, "\"seek\",{},\"absolute-percent\"", percent),
+			CmdSeekInner::RelativeTime(time) => write!(w, "\"seek\",{},\"relative\"", time),
+			CmdSeekInner::RelativePercent(percent) => write!(w, "\"seek\",{},\"relative-percent\"", percent)
 		}
 	}
 
