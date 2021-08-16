@@ -7,7 +7,7 @@ use std::{
 use anyhow::Context;
 use clap::{App, Arg, ArgGroup, ArgMatches, SubCommand};
 
-use mpvsock::{command::commands::{CmdCycleProperty, CmdGetProperty, CmdGetVersion, CmdSeek, CmdSetProperty}, link::MpvLink};
+use mpvsock::{command::commands::{CmdCycleProperty, CmdGetProperty, CmdGetVersion, CmdRawJsonArgs, CmdRawText, CmdSeek, CmdSetProperty}, link::MpvLink};
 
 fn parse_cli() -> ArgMatches<'static> {
 	App::new(env!("CARGO_PKG_NAME"))
@@ -264,11 +264,11 @@ impl InteractiveContext {
 			InputMode::Raw => {
 				writeln!(
 					&mut out,
-					"\tRaw mode is on, input is directly pasted as JSON array elements"
+					"\tRaw mode is on, input is directly pasted as command"
 				)?;
 			}
 			InputMode::String => {
-				writeln!(&mut out, "\tString mode is on, input is split by spaces and elements are quoted (prefix element with @ to disable quoting)")?;
+				writeln!(&mut out, "\tString mode is on, input is split by spaces and elements are quoted (prefix element with @ to disable quoting), then used as JSON array elements")?;
 			}
 			InputMode::Known => {
 				writeln!(&mut out, "\tKnown mode is on, only known commands are accepted and their result is properly parsed")?;
@@ -283,7 +283,12 @@ impl InteractiveContext {
 	}
 
 	fn run_raw_command(&mut self, mpv: &mut MpvLink, mut out: impl Write) -> anyhow::Result<()> {
-		write_result_and_bail!(out; mpv.run_command(self.line.as_str()))
+		write_result_and_bail!(
+			out;
+			mpv.run_command_raw::<_, std::convert::Infallible>(
+				&CmdRawText::new(self.line.as_str())
+			)
+		)
 	}
 
 	fn run_string_command(&mut self, mpv: &mut MpvLink, mut out: impl Write) -> anyhow::Result<()> {
@@ -302,14 +307,19 @@ impl InteractiveContext {
 		// remove the trailing comma
 		let command = &self.command[.. self.command.len().saturating_sub(1)];
 
-		write_result_and_bail!(out; mpv.run_command(command))
+		write_result_and_bail!(
+			out;
+			mpv.run_command(
+				&CmdRawJsonArgs::new(command)
+			)
+		)
 	}
 
 	fn run_known_command(&mut self, mpv: &mut MpvLink, mut out: impl Write) -> anyhow::Result<()> {
 		use mpvsock::command::property;
 
 		if self.line.trim() == "get_version" {
-			write_result_and_bail!(out; mpv.run_command(&CmdGetVersion))
+			write_result_and_bail!(out; mpv.run_command(&CmdGetVersion::new()))
 		}
 
 		if self.line.starts_with("get_property ") || self.line.starts_with("get ") {

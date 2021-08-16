@@ -1,9 +1,9 @@
-use std::{io, num::NonZeroI64, path::Path};
+use std::{io::{self, Write}, num::NonZeroI64, path::Path};
 
 use serde::de::DeserializeOwned;
 use thiserror::Error;
 
-use crate::response_buffer::ResponseBuffer;
+use crate::{command::MpvCommandRaw, response_buffer::ResponseBuffer};
 
 #[cfg(unix)]
 pub mod unix;
@@ -13,8 +13,7 @@ type InnerLink = unix::MpvLink;
 
 use crate::command::{
 	response::{MpvResponse, MpvResponseEvent, MpvResponseResult, MpvResponseResultError},
-	MpvCommand,
-	MpvCommandContext
+	MpvCommand
 };
 
 #[derive(Debug, Error)]
@@ -121,25 +120,19 @@ impl MpvLink {
 		&mut self,
 		command: &C
 	) -> Result<C::ParsedData, CommandError<C::Error>> {
-		let current_id = {
-			let current = self.current_id;
-			self.current_id =
-				NonZeroI64::new(self.current_id.get().wrapping_add(1)).unwrap_or(Self::NONZERO_ONE);
-			current
-		};
+		let current_id = self.run_command_raw(command)?;
 
-		self.send_command(command, current_id)?;
-
-		let result = self.next_result::<C::Data>()?;
-
-		match result.request_id() {
-			Some(request_id) if request_id == current_id.get() => (),
-			request_id => {
-				return Err(ReceiveError::RequestIdMismatch {
-					expected: current_id.get(),
-					found: request_id.unwrap_or(0)
+		let result = loop {
+			let result = self.next_result::<C::Data>()?;
+			match result.request_id() {
+				Some(request_id) if request_id == current_id.get() => break result,
+				request_id => {
+					return Err(ReceiveError::RequestIdMismatch {
+						expected: current_id.get(),
+						found: request_id.unwrap_or(0)
+					}
+					.into())
 				}
-				.into())
 			}
 		};
 
@@ -153,6 +146,23 @@ impl MpvLink {
 				Ok(data)
 			}
 		}
+	}
+
+	/// Runs a `MpvCommandRaw` and does not wait for the result.
+	pub fn run_command_raw<C: MpvCommandRaw + ?Sized, E: std::error::Error>(
+		&mut self,
+		command: &C
+	) -> Result<NonZeroI64, CommandError<E>> {
+		let current_id = {
+			let current = self.current_id;
+			self.current_id =
+				NonZeroI64::new(self.current_id.get().wrapping_add(1)).unwrap_or(Self::NONZERO_ONE);
+			current
+		};
+
+		self.send_command(command, current_id)?;
+
+		Ok(current_id)
 	}
 
 	/// Polls for events which are added to the internal queue.
@@ -182,23 +192,24 @@ impl MpvLink {
 		self.event_queue.drain(..)
 	}
 
-	fn send_command<C: MpvCommand + ?Sized>(
+	fn send_command<C: MpvCommandRaw + ?Sized>(
 		&mut self,
 		command: &C,
 		current_id: NonZeroI64
 	) -> Result<(), SendError> {
-		let context = MpvCommandContext::new(command, Some(current_id));
-
 		if log::log_enabled!(log::Level::Debug) {
 			let mut buffer = Vec::new();
-			context.write(&mut buffer)?;
+			command.write(&mut buffer, Some(current_id))?;
 
 			match std::str::from_utf8(&buffer) {
 				Ok(command) => log::debug!("Sending command: {}", command),
 				Err(_) => log::debug!("Sending command: {:?}", buffer)
 			};
 		}
-		context.writeln(self.inner.stream())?;
+
+		let mut stream = self.inner.stream();
+		command.write(&mut stream, Some(current_id))?;
+		writeln!(stream)?;
 
 		Ok(())
 	}
@@ -206,6 +217,7 @@ impl MpvLink {
 	fn next_response<ResponseData: DeserializeOwned>(
 		&mut self
 	) -> Result<Option<MpvResponse<ResponseData>>, ReceiveError> {
+		log::trace!("Waiting for next response");
 		let line = match self.response_buffer.consume_line() {
 			Some(line) => line,
 			None => {
@@ -225,8 +237,10 @@ impl MpvLink {
 	fn next_result<Data: DeserializeOwned>(
 		&mut self
 	) -> Result<MpvResponseResult<Data>, ReceiveError> {
+		log::trace!("Waiting for next result");
 		let result = loop {
 			match self.next_response()? {
+				// TODO: Handle deadlock from issuing a non-result command through non-raw interface throuw timeout?
 				None => self.inner.wait_read(None)?,
 				Some(response) => match response {
 					MpvResponse::Event(event) => {

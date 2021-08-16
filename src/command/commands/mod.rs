@@ -2,17 +2,36 @@ use std::borrow::Cow;
 
 use crate::model::FileloadInfo;
 
+use super::MpvCommandRaw;
 use super::property::MpvProperty;
 
 use super::MpvCommand;
 
-impl MpvCommand for str {
+pub struct CmdRawText<S: AsRef<str>>(S);
+impl<S: AsRef<str>> CmdRawText<S> {
+	pub fn new(text: S) -> Self {
+		Self(text)
+	}
+}
+impl<S: AsRef<str>> MpvCommandRaw for CmdRawText<S> {
+	fn write(&self, mut w: impl std::io::Write, _request_id: Option<std::num::NonZeroI64>) -> std::io::Result<()> {
+		write!(w, "{}", self.0.as_ref())
+	}
+}
+
+pub struct CmdRawJsonArgs<S: AsRef<str>>(S);
+impl<S: AsRef<str>> CmdRawJsonArgs<S> {
+	pub fn new(text: S) -> Self {
+		Self(text)
+	}
+}
+impl<S: AsRef<str>> MpvCommand for CmdRawJsonArgs<S> {
 	type Data = Option<serde_json::Value>;
 	type Error = std::convert::Infallible;
 	type ParsedData = serde_json::Value;
 
 	fn write_args(&self, mut w: impl std::io::Write) -> std::io::Result<()> {
-		write!(w, "{}", self)
+		write!(w, "{}", self.0.as_ref())
 	}
 
 	fn parse_data(&self, data: Self::Data) -> Result<Self::ParsedData, Self::Error> {
@@ -25,7 +44,12 @@ impl MpvCommand for str {
 	}
 }
 
-pub struct CmdGetVersion;
+pub struct CmdGetVersion(std::marker::PhantomData<()>);
+impl CmdGetVersion {
+	pub fn new() -> Self {
+		CmdGetVersion(std::marker::PhantomData)
+	}
+}
 impl MpvCommand for CmdGetVersion {
 	type Data = u32;
 	type Error = serde_json::Error;
@@ -155,7 +179,7 @@ impl MpvCommand for CmdUnobserveProperty {
 	}
 }
 
-pub struct CmdLoadfile<'a>(pub Cow<'a, str>);
+pub struct CmdLoadfile<'a>(Cow<'a, str>);
 impl<'a> CmdLoadfile<'a> {
 	pub fn new(file_path: Cow<'a, str>) -> Self {
 		CmdLoadfile(file_path)
@@ -239,5 +263,17 @@ impl MpvCommand for CmdSeek {
 
 	fn parse_data(&self, data: Self::Data) -> Result<Self::ParsedData, Self::Error> {
 		Ok(data)
+	}
+}
+
+pub struct CmdShowProgress(std::marker::PhantomData<()>);
+impl CmdShowProgress {
+	pub fn new() -> Self {
+		CmdShowProgress(std::marker::PhantomData)
+	}
+}
+impl MpvCommandRaw for CmdShowProgress {
+	fn write(&self, mut w: impl std::io::Write, _request_id: Option<std::num::NonZeroI64>) -> std::io::Result<()> {
+		write!(w, "show-progress")
 	}
 }
