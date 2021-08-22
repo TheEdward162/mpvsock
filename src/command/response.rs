@@ -111,7 +111,9 @@ pub enum MpvResponseResultError {
 	#[serde(rename = "property unavailable")]
 	PropertyUnavailable,
 	#[serde(rename = "property not found")]
-	PropertyNotFound
+	PropertyNotFound,
+	#[serde(rename = "error running command")]
+	ErrorRunningCommand
 }
 
 /// Either a mpv event or a mpv result.
