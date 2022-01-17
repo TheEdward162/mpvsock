@@ -1,7 +1,7 @@
 [package]
 name = "mpvsock"
 version = "0.1.0"
-edition = "2018"
+edition = "2021"
 authors = ["TheEdward162 <TheEdward162@gmail.com>"]
 license = "MIT/Apache-2.0"
 readme = "README.md"
