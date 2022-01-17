@@ -2,8 +2,7 @@ use std::borrow::Cow;
 
 use crate::model::FileloadInfo;
 
-use super::MpvCommandRaw;
-use super::property::MpvProperty;
+use super::{property::MpvProperty, MpvCommandRaw};
 
 use super::MpvCommand;
 
@@ -14,7 +13,11 @@ impl<S: AsRef<str>> CmdRawText<S> {
 	}
 }
 impl<S: AsRef<str>> MpvCommandRaw for CmdRawText<S> {
-	fn write(&self, mut w: impl std::io::Write, _request_id: Option<std::num::NonZeroI64>) -> std::io::Result<()> {
+	fn write(
+		&self,
+		mut w: impl std::io::Write,
+		_request_id: Option<std::num::NonZeroI64>
+	) -> std::io::Result<()> {
 		write!(w, "{}", self.0.as_ref())
 	}
 }
@@ -127,7 +130,7 @@ impl<P: MpvProperty> MpvCommand for CmdCycleProperty<P> {
 			false => "up",
 			true => "down"
 		};
-		
+
 		write!(w, "\"cycle\",\"{}\",\"{}\"", self.0.name(), direction)?;
 
 
@@ -255,9 +258,13 @@ impl MpvCommand for CmdSeek {
 	fn write_args(&self, mut w: impl std::io::Write) -> std::io::Result<()> {
 		match self.0 {
 			CmdSeekInner::AbsoluteTime(time) => write!(w, "\"seek\",{},\"absolute\"", time),
-			CmdSeekInner::AbsolutePercent(percent) => write!(w, "\"seek\",{},\"absolute-percent\"", percent),
+			CmdSeekInner::AbsolutePercent(percent) => {
+				write!(w, "\"seek\",{},\"absolute-percent\"", percent)
+			}
 			CmdSeekInner::RelativeTime(time) => write!(w, "\"seek\",{},\"relative\"", time),
-			CmdSeekInner::RelativePercent(percent) => write!(w, "\"seek\",{},\"relative-percent\"", percent)
+			CmdSeekInner::RelativePercent(percent) => {
+				write!(w, "\"seek\",{},\"relative-percent\"", percent)
+			}
 		}
 	}
 
@@ -273,7 +280,11 @@ impl CmdShowProgress {
 	}
 }
 impl MpvCommandRaw for CmdShowProgress {
-	fn write(&self, mut w: impl std::io::Write, _request_id: Option<std::num::NonZeroI64>) -> std::io::Result<()> {
+	fn write(
+		&self,
+		mut w: impl std::io::Write,
+		_request_id: Option<std::num::NonZeroI64>
+	) -> std::io::Result<()> {
 		write!(w, "show-progress")
 	}
 }

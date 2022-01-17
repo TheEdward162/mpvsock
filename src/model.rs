@@ -1,4 +1,4 @@
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize)]
 pub struct FileloadInfo {
@@ -60,7 +60,7 @@ mod test {
 	use serde_json::json;
 
 	use super::TrackId;
-	
+
 	#[test]
 	fn parse_track_id_index() {
 		let value = json!(1);

@@ -46,8 +46,12 @@ pub trait MpvCommand: MpvCommandRaw {
 }
 
 impl<T: MpvCommand> MpvCommandRaw for T {
-	fn write(&self, mut w: impl io::Write, request_id: Option<NonZeroI64>) -> io::Result<()>  {
-		write!(w, "{{\"request_id\":{},\"command\":[", request_id.map(|n| n.get()).unwrap_or(0))?;
+	fn write(&self, mut w: impl io::Write, request_id: Option<NonZeroI64>) -> io::Result<()> {
+		write!(
+			w,
+			"{{\"request_id\":{},\"command\":[",
+			request_id.map(|n| n.get()).unwrap_or(0)
+		)?;
 		self.write_args(&mut w)?;
 		write!(w, "]}}",)?;
 

@@ -7,7 +7,18 @@ use std::{
 use anyhow::Context;
 use clap::{App, Arg, ArgGroup, ArgMatches, SubCommand};
 
-use mpvsock::{command::commands::{CmdCycleProperty, CmdGetProperty, CmdGetVersion, CmdRawJsonArgs, CmdRawText, CmdSeek, CmdSetProperty}, link::MpvLink};
+use mpvsock::{
+	command::commands::{
+		CmdCycleProperty,
+		CmdGetProperty,
+		CmdGetVersion,
+		CmdRawJsonArgs,
+		CmdRawText,
+		CmdSeek,
+		CmdSetProperty
+	},
+	link::MpvLink
+};
 
 fn parse_cli() -> ArgMatches<'static> {
 	App::new(env!("CARGO_PKG_NAME"))
@@ -463,7 +474,7 @@ impl InteractiveContext {
 			let target = write_error_and_bail!(
 				&mut out; iter.next().context("seek expects at least one argument").and_then(|value| value.parse::<f64>().context("seek expects an f64 first argument"))
 			);
-			
+
 			let command = match iter.next() {
 				Some("absolute") => CmdSeek::time(target, true),
 				Some("absolute-percent") => CmdSeek::percent(target, true),

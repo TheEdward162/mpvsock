@@ -1,4 +1,8 @@
-use std::{io::{self, Write}, num::NonZeroI64, path::Path};
+use std::{
+	io::{self, Write},
+	num::NonZeroI64,
+	path::Path
+};
 
 use serde::de::DeserializeOwned;
 use thiserror::Error;

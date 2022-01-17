@@ -131,7 +131,7 @@ impl MpvLink {
 	/// If timeout is not `None` then returns `Err(TimedOut)` on timeout.
 	pub fn wait_read(&self, timeout: Option<std::time::Duration>) -> Result<(), io::Error> {
 		log::trace!("Waiting on stream (timeout = {:?})", timeout);
-		
+
 		let fd = match &self.inner {
 			MpvLinkInner::Closed => panic!("Mpv link closed"),
 			MpvLinkInner::Child { socket, .. } => socket.as_raw_fd(),
