@@ -5,6 +5,8 @@ edition = "2021"
 authors = ["TheEdward162 <TheEdward162@gmail.com>"]
 license = "MIT/Apache-2.0"
 readme = "README.md"
+repository = "https://github.com/TheEdward162/mpvsock"
+description = "mpv socket ipc client with MIT/Apache-2.0 license"
 
 [[bin]]
 name = "mpv-client"
