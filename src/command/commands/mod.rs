@@ -182,10 +182,15 @@ impl MpvCommand for CmdUnobserveProperty {
 	}
 }
 
-pub struct CmdLoadfile<'a>(Cow<'a, str>);
+
+pub struct CmdLoadfile<'a>(Cow<'a, str>, bool);
 impl<'a> CmdLoadfile<'a> {
 	pub fn new(file_path: Cow<'a, str>) -> Self {
-		CmdLoadfile(file_path)
+		CmdLoadfile(file_path, false)
+	}
+
+	pub fn new_append(file_path: Cow<'a, str>) -> Self {
+		CmdLoadfile(file_path, true)
 	}
 }
 impl<'a> MpvCommand for CmdLoadfile<'a> {
@@ -194,7 +199,11 @@ impl<'a> MpvCommand for CmdLoadfile<'a> {
 	type ParsedData = Self::Data;
 
 	fn write_args(&self, mut w: impl std::io::Write) -> std::io::Result<()> {
-		write!(w, "\"loadfile\",\"{}\"", self.0)
+		if self.1 {
+			write!(w, "\"loadfile\",\"{}\",\"append\"", self.0)
+		} else {
+			write!(w, "\"loadfile\",\"{}\"", self.0)
+		}
 	}
 
 	fn parse_data(&self, data: Self::Data) -> Result<Self::ParsedData, Self::Error> {
@@ -286,5 +295,37 @@ impl MpvCommandRaw for CmdShowProgress {
 		_request_id: Option<std::num::NonZeroI64>
 	) -> std::io::Result<()> {
 		write!(w, "show-progress")
+	}
+}
+
+pub struct CmdPlaylistClear(std::marker::PhantomData<()>);
+impl CmdPlaylistClear {
+	pub fn new() -> Self {
+		CmdPlaylistClear(std::marker::PhantomData)
+	}
+}
+impl MpvCommandRaw for CmdPlaylistClear {
+	fn write(
+		&self,
+		mut w: impl std::io::Write,
+		_request_id: Option<std::num::NonZeroI64>
+	) -> std::io::Result<()> {
+		write!(w, "playlist-clear")
+	}
+}
+
+pub struct CmdPlaylistShuffle(std::marker::PhantomData<()>);
+impl CmdPlaylistShuffle {
+	pub fn new() -> Self {
+		CmdPlaylistShuffle(std::marker::PhantomData)
+	}
+}
+impl MpvCommandRaw for CmdPlaylistShuffle {
+	fn write(
+		&self,
+		mut w: impl std::io::Write,
+		_request_id: Option<std::num::NonZeroI64>
+	) -> std::io::Result<()> {
+		write!(w, "playlist-shuffle")
 	}
 }

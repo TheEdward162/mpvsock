@@ -170,28 +170,25 @@ impl MpvLink {
 	}
 
 	/// Polls for events which are added to the internal queue.
-	///
-	/// Returns the currently queued events.
-	pub fn poll_events(&mut self) -> Result<&[MpvResponseEvent], ReceiveError> {
+	pub fn poll_events(&mut self) -> Result<(), ReceiveError> {
 		loop {
 			match self.next_response()? {
 				None => break,
-				Some(response) => match response {
-					MpvResponse::Event(event) => {
-						log::trace!("Queued event: {:?}", event);
-						self.event_queue.push(event);
-					}
-					MpvResponse::Result(result) => {
-						return Err(ReceiveError::UnexpectedResponseResult(result))
-					}
+				Some(MpvResponse::Event(event)) => {
+					log::trace!("Queued event: {:?}", event);
+					self.event_queue.push(event);
+				}
+				Some(MpvResponse::Result(result)) => {
+					return Err(ReceiveError::UnexpectedResponseResult(result))
 				}
 			};
 		}
 		self.response_buffer.shift();
 
-		Ok(&self.event_queue)
+		Ok(())
 	}
 
+	/// Drains the internal queue of events, returning the iterator.
 	pub fn drain_events(&mut self) -> impl Iterator<Item = MpvResponseEvent> + '_ {
 		self.event_queue.drain(..)
 	}
@@ -218,6 +215,26 @@ impl MpvLink {
 		Ok(())
 	}
 
+	fn next_result<Data: DeserializeOwned>(
+		&mut self
+	) -> Result<MpvResponseResult<Data>, ReceiveError> {
+		log::trace!("Waiting for next result");
+		let result = loop {
+			match self.next_response()? {
+				// TODO: Handle deadlock from issuing a non-result command through non-raw interface throuw timeout?
+				None => self.inner.wait_read(None)?,
+				Some(MpvResponse::Event(event)) => {
+					log::trace!("Queued event: {:?}", event);
+					self.event_queue.push(event);
+				}
+				Some(MpvResponse::Result(result))  => break result
+			};
+		};
+		self.response_buffer.shift();
+
+		Ok(result)
+	}
+
 	fn next_response<ResponseData: DeserializeOwned>(
 		&mut self
 	) -> Result<Option<MpvResponse<ResponseData>>, ReceiveError> {
@@ -236,27 +253,5 @@ impl MpvLink {
 		let response: MpvResponse<ResponseData> = serde_json::from_slice(line)?;
 
 		Ok(Some(response))
-	}
-
-	fn next_result<Data: DeserializeOwned>(
-		&mut self
-	) -> Result<MpvResponseResult<Data>, ReceiveError> {
-		log::trace!("Waiting for next result");
-		let result = loop {
-			match self.next_response()? {
-				// TODO: Handle deadlock from issuing a non-result command through non-raw interface throuw timeout?
-				None => self.inner.wait_read(None)?,
-				Some(response) => match response {
-					MpvResponse::Event(event) => {
-						log::trace!("Queued event: {:?}", event);
-						self.event_queue.push(event);
-					}
-					MpvResponse::Result(result) => break result
-				}
-			};
-		};
-		self.response_buffer.shift();
-
-		Ok(result)
 	}
 }
