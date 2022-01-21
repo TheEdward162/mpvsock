@@ -72,10 +72,10 @@ impl ResponseBuffer {
 				if log::log_enabled!(log::Level::Debug) {
 					match std::str::from_utf8(line) {
 						Ok(line) => {
-							log::trace!("Consumed line: {}", line);
+							log::debug!("Consumed line: {}", line);
 						}
 						Err(_err) => {
-							log::trace!("Consumed line: {:?}", line)
+							log::debug!("Consumed line: {:?}", line)
 						}
 					}
 				}
