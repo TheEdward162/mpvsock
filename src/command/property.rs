@@ -73,6 +73,8 @@ impl_known_property! {
 	Volume: "volume", f64,
 	PercentPos: "percent-pos", f64,
 	TimePos: "time-pos", f64,
+	// u32
+	ImageDisplayDuration: "image-display-duration", u32,
 	// String
 	Path: "path", String,
 	WorkingDirectory: "working-directory", String,
@@ -85,4 +87,6 @@ impl_known_property! {
 	// bool
 	Fullscreen: "fullscreen", bool,
 	Pause: "pause", bool,
+	KeepOpen: "keep-open", bool,
+	LoopPlaylist: "loop-playlist", bool,
 }
